@@ -4,7 +4,7 @@ defmodule Ticker do
   @name     :ticker
 
   def start do
-    pid = spawn(__MODULE__, :generator, [[]])
+    pid = spawn(__MODULE__, :generator, [[], 0])
     :global.register_name(@name, pid)
   end
 
@@ -12,22 +12,26 @@ defmodule Ticker do
     send :global.whereis_name(@name), { :register, client_pid }
   end
 
-  def generator(clients) do
+  def generator(clients, idx) when length(clients) != 0 and idx >= length(clients), do: generator(clients, 0)
+
+  def generator(clients, idx) do
     receive do
       { :register, pid } ->
         IO.puts "registering #{inspect pid}"
-        generator([pid | clients]) # new list by prepending pid to clients
+        generator([pid | clients], idx) # new list by prepending pid to clients
 
       after
         @interval ->
-          IO.puts "tick [server]"
-          Enum.each clients, fn client ->
-            send client, { :tick }
+          case Enum.at(clients, idx, :none) do
+            :none -> IO.puts "[server] I'd be ticking but no one is there to listen"
+            client ->
+              IO.puts " [server] ticks"
+              send client, { :tick }
           end
-
-      generator(clients)
+          generator(clients, idx + 1)
     end
   end
+
 end
 
 defmodule Client do
@@ -44,4 +48,5 @@ defmodule Client do
         receiver()
     end
   end
+
 end
